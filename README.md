@@ -1,4 +1,4 @@
-# Rigorstarter Rust Tauri WebGPU
+# Rigorstarter Rust Winit WebGPU
 
 A lightweight, high-performance WebGPU boilerplate and demonstration project written in Rust. It features a high-level immediate-mode `Canvas` API and a complete demo suite including a fuzzy-searchable launcher and a classic Snake game.
 
@@ -25,14 +25,14 @@ A lightweight, high-performance WebGPU boilerplate and demonstration project wri
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [Rust](https
+- [Rust](https://rustup.rs/)
 - [WGPU-compatible GPU Drivers](https://gpuinfo.org/) (Vulkan, Metal, or DX12)
 
 ### Installation & Running
 1. Clone the repository:
    ```bash
    git clone <repo-url>
-   cd rigorstarter-rust-tauri-webgpu
+   cd rigorstarter-rust-winit-webgpu
    ```
 2. Run the application:
    ```bash

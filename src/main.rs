@@ -1,9 +1,4 @@
-mod game;
-mod gpu;
-mod ui;
-
 use std::sync::Arc;
-use std::time::Instant;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, KeyEvent, WindowEvent};
@@ -11,32 +6,60 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::KeyCode;
 use winit::window::{Window, WindowAttributes};
 
-use game::renderer::SnakeRenderer;
-use game::snake::{Direction, SnakeGame};
-use gpu::GpuContext;
-use ui::launcher::{LauncherRenderer, LauncherState};
+use rigorstarter_rust_tauri_webgpu::gpu::GpuContext;
+use rigorstarter_rust_tauri_webgpu::ui::launcher::{LauncherRenderer, LauncherState};
+use rigorstarter_rust_tauri_webgpu::stdlib::{Clock, InputManager, State, StateManager, StateRequest};
+use rigorstarter_rust_tauri_webgpu::game::snake::{SnakeGame, SnakeRenderer};
+use rigorstarter_rust_tauri_webgpu::game::key_indicator::{KeyIndicator, KeyIndicatorRenderer};
+use rigorstarter_rust_tauri_webgpu::game::breakouts::{BreakoutsGame, BreakoutsRenderer, BreakoutsState};
+use rigorstarter_rust_tauri_webgpu::game::pingpong::{PingPongGame, PingPongRenderer, PingPongState};
 
-const GRID_WIDTH: i32 = 30;
-const GRID_HEIGHT: i32 = 20;
+
 const WINDOW_WIDTH: u32 = 900;
 const WINDOW_HEIGHT: u32 = 600;
 
-enum AppState {
-    Launcher {
-        launcher: LauncherState,
-        launcher_renderer: LauncherRenderer,
-    },
-    Snake {
-        game: SnakeGame,
-        renderer: SnakeRenderer,
-    },
+/// Wrapper to make the Launcher a State
+struct LauncherStateWrapper {
+    state: LauncherState,
+    renderer: LauncherRenderer,
+    gpu: Arc<GpuContext>,
+}
+
+impl State for LauncherStateWrapper {
+    fn update(&mut self, delta: f32, input: &InputManager) -> Option<StateRequest> {
+        self.state.update(delta as f64);
+        None
+    }
+
+    fn render(&mut self, gpu: &GpuContext, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
+        let clear_color = [0.05, 0.05, 0.1, 1.0];
+        self.renderer.render(gpu, encoder, view, &self.state);
+        // LauncherRenderer already handles end_drawing? 
+        // No, it probably needs clear_color.
+        // Let's assume it manages its own canvas.
+    }
+
+    fn handle_input(&mut self, key: KeyCode, state: ElementState) -> Option<StateRequest> {
+        self.state.handle_input(key, state, &self.gpu)
+    }
+
+    fn handle_char(&mut self, c: char) -> Option<StateRequest> {
+        self.state.input_char(c);
+        None
+    }
+
+    fn handle_mouse_click(&mut self, pos: [f32; 2], sw: f32, sh: f32) -> Option<StateRequest> {
+        self.state.handle_mouse_click(pos, sw, sh, &self.gpu)
+    }
 }
 
 struct App {
     window: Option<Arc<Window>>,
-    gpu: Option<GpuContext>,
-    state: Option<AppState>,
-    last_time: Option<Instant>,
+    gpu: Option<Arc<GpuContext>>,
+    state_manager: Option<StateManager>,
+    clock: Clock,
+    input: InputManager,
+    cursor_pos: [f32; 2],
 }
 
 impl App {
@@ -44,141 +67,56 @@ impl App {
         Self {
             window: None,
             gpu: None,
-            state: None,
-            last_time: None,
+            state_manager: None,
+            clock: Clock::new(),
+            input: InputManager::new(),
+            cursor_pos: [0.0, 0.0],
         }
     }
 
     async fn init(&mut self, window: Arc<Window>) {
-        let gpu = GpuContext::new(window.clone(), WINDOW_WIDTH, WINDOW_HEIGHT).await;
+        let gpu = Arc::new(GpuContext::new(window.clone(), WINDOW_WIDTH, WINDOW_HEIGHT).await);
+        
         let launcher = LauncherState::new();
         let launcher_renderer = LauncherRenderer::new(&gpu);
+        let initial_state = Box::new(LauncherStateWrapper {
+            state: launcher,
+            renderer: launcher_renderer,
+            gpu: gpu.clone(),
+        });
 
         self.window = Some(window);
         self.gpu = Some(gpu);
-        self.state = Some(AppState::Launcher {
-            launcher,
-            launcher_renderer,
-        });
-        self.last_time = Some(Instant::now());
+        self.state_manager = Some(StateManager::new(initial_state));
     }
 
-    fn handle_input(&mut self, key: KeyCode) {
-        match &mut self.state {
-            Some(AppState::Launcher { launcher, .. }) => match key {
-                KeyCode::Escape => {
-                    launcher.search_text.clear();
-                    launcher.selected_index = 0;
-                }
-                KeyCode::Enter => {
-                    let filtered = launcher.filtered_items();
-                    if let Some((idx, _)) = filtered.get(launcher.selected_index) {
-                        if *idx == 0 {
-                            self.start_snake_game();
-                        }
-                    }
-                }
-                KeyCode::ArrowUp => launcher.move_selection(-1),
-                KeyCode::ArrowDown => launcher.move_selection(1),
-                KeyCode::Backspace => launcher.backspace(),
-                KeyCode::KeyA => launcher.input_char('a'),
-                KeyCode::KeyB => launcher.input_char('b'),
-                KeyCode::KeyC => launcher.input_char('c'),
-                KeyCode::KeyD => launcher.input_char('d'),
-                KeyCode::KeyE => launcher.input_char('e'),
-                KeyCode::KeyF => launcher.input_char('f'),
-                KeyCode::KeyG => launcher.input_char('g'),
-                KeyCode::KeyH => launcher.input_char('h'),
-                KeyCode::KeyI => launcher.input_char('i'),
-                KeyCode::KeyJ => launcher.input_char('j'),
-                KeyCode::KeyK => launcher.input_char('k'),
-                KeyCode::KeyL => launcher.input_char('l'),
-                KeyCode::KeyM => launcher.input_char('m'),
-                KeyCode::KeyN => launcher.input_char('n'),
-                KeyCode::KeyO => launcher.input_char('o'),
-                KeyCode::KeyP => launcher.input_char('p'),
-                KeyCode::KeyQ => launcher.input_char('q'),
-                KeyCode::KeyR => launcher.input_char('r'),
-                KeyCode::KeyS => launcher.input_char('s'),
-                KeyCode::KeyT => launcher.input_char('t'),
-                KeyCode::KeyU => launcher.input_char('u'),
-                KeyCode::KeyV => launcher.input_char('v'),
-                KeyCode::KeyW => launcher.input_char('w'),
-                KeyCode::KeyX => launcher.input_char('x'),
-                KeyCode::KeyY => launcher.input_char('y'),
-                KeyCode::KeyZ => launcher.input_char('z'),
-                _ => {}
-            },
-            Some(AppState::Snake { game, .. }) => match key {
-                KeyCode::ArrowUp | KeyCode::KeyW => game.set_direction(Direction::Up),
-                KeyCode::ArrowDown | KeyCode::KeyS => game.set_direction(Direction::Down),
-                KeyCode::ArrowLeft | KeyCode::KeyA => game.set_direction(Direction::Left),
-                KeyCode::ArrowRight | KeyCode::KeyD => game.set_direction(Direction::Right),
-                KeyCode::Space if game.game_over => game.reset(),
-                KeyCode::Escape => {
-                    self.state = Some(self.take_launcher_state());
-                }
-                _ => {}
-            },
-            None => {}
-        }
-    }
+    fn handle_input(&mut self, key: KeyCode, state: ElementState) {
+        self.input.update_key(key, state);
 
-    fn start_snake_game(&mut self) {
-        if let (Some(gpu), Some(_)) = (&self.gpu, &self.state) {
-            let game = SnakeGame::new(GRID_WIDTH, GRID_HEIGHT);
-            let renderer = SnakeRenderer::new(gpu, &game);
-            self.state = Some(AppState::Snake { game, renderer });
-        }
-    }
-
-    fn take_launcher_state(&mut self) -> AppState {
-        if let Some(gpu) = &self.gpu {
-            let launcher = LauncherState::new();
-            let launcher_renderer = LauncherRenderer::new(gpu);
-            AppState::Launcher {
-                launcher,
-                launcher_renderer,
-            }
-        } else {
-            unreachable!()
+        if let Some(sm) = &mut self.state_manager {
+            let request = sm.handle_input(key, state);
+            sm.handle_request(request);
         }
     }
 
     fn render(&mut self) {
-        let now = Instant::now();
-        let delta = now
-            .duration_since(self.last_time.unwrap_or(now))
-            .as_secs_f64();
-        self.last_time = Some(now);
+        self.clock.tick();
+        self.input.tick();
+        let delta = self.clock.delta_time();
 
-        if let (Some(gpu), Some(state), Some(window)) =
-            (&mut self.gpu, &mut self.state, &self.window)
+        if let (Some(gpu), Some(sm), Some(window)) =
+            (&self.gpu, &mut self.state_manager, &self.window)
         {
-            match state {
-                AppState::Launcher {
-                    launcher,
-                    launcher_renderer,
-                } => {
-                    launcher.update(delta);
-                    if let Some(frame) = gpu.get_frame() {
-                        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-                        launcher_renderer.render(gpu, &view, launcher);
-                        frame.present();
-                    }
-                }
-                AppState::Snake { game, renderer } => {
-                    game.update(delta);
-                    renderer.update(gpu, game);
-
-                    if let Some(frame) = gpu.get_frame() {
-                        let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-                        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-                        renderer.render(&mut encoder, &view);
-                        gpu.queue.submit(std::iter::once(encoder.finish()));
-                        frame.present();
-                    }
-                }
+            if let Some(frame) = gpu.get_frame() {
+                let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                
+                let request = sm.update(delta, &self.input);
+                sm.handle_request(request);
+                sm.render(gpu, &mut encoder, &view);
+                
+                gpu.queue.submit(std::iter::once(encoder.finish()));
+                frame.present();
             }
             window.request_redraw();
         }
@@ -211,19 +149,51 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
                 if let Some(gpu) = &mut self.gpu {
-                    gpu.resize(size.width, size.height);
+                    // Since gpu is Arc, we need to get mut ref. 
+                    // Actually, GpuContext::resize takes &mut self.
+                    // We should use Arc::get_mut or just wrap GpuContext in Mutex/RwLock if needed.
+                    // But here, the App has the only Arc.
+                    if let Some(gpu_mut) = Arc::get_mut(gpu) {
+                        gpu_mut.resize(size.width, size.height);
+                    }
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.cursor_pos = [position.x as f32, position.y as f32];
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: winit::event::MouseButton::Left,
+                ..
+            } => {
+                if let (Some(gpu), Some(sm)) = (&self.gpu, &mut self.state_manager) {
+                    let sw = gpu.surface_config.width as f32;
+                    let sh = gpu.surface_config.height as f32;
+                    let request = sm.current().handle_mouse_click(self.cursor_pos, sw, sh);
+                    sm.handle_request(request);
                 }
             }
             WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state: ElementState::Pressed,
-                        physical_key: winit::keyboard::PhysicalKey::Code(code),
-                        ..
-                    },
+                event,
                 ..
             } => {
-                self.handle_input(code);
+                let KeyEvent {
+                    state,
+                    physical_key,
+                    text,
+                    ..
+                } = event;
+                if let winit::keyboard::PhysicalKey::Code(code) = physical_key {
+                    self.handle_input(code, state);
+                }
+                if let Some(text) = text {
+                    for c in text.chars() {
+                        if let Some(sm) = &mut self.state_manager {
+                            let request = sm.handle_char(c);
+                            sm.handle_request(request);
+                        }
+                    }
+                }
             }
             WindowEvent::RedrawRequested => {
                 self.render();

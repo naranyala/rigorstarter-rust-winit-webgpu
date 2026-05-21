@@ -4,10 +4,14 @@ use winit::window::Window;
 mod buffer;
 mod pipeline;
 mod texture;
+mod text;
+mod geom;
 
 pub use buffer::*;
 pub use pipeline::*;
 pub use texture::*;
+pub use text::*;
+pub use geom::*;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -16,115 +20,17 @@ pub struct Vertex {
     pub color: [f32; 4],
 }
 
-// 5x7 Bitmap Font Data
-pub const FONT_DATA: &[ [u8; 7] ] = &[
-    [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], // space
-    [0x00, 0x00, 0x5F, 0x00, 0x00, 0x00, 0x00], // !
-    [0x00, 0x07, 0x00, 0x07, 0x00, 0x00, 0x00], // "
-    [0x14, 0x7F, 0x14, 0x7F, 0x14, 0x00, 0x00], // #
-    [0x24, 0x2A, 0x7F, 0x2A, 0x12, 0x00, 0x00], // $
-    [0x23, 0x13, 0x08, 0x64, 0x62, 0x00, 0x00], // %
-    [0x36, 0x49, 0x55, 0x22, 0x50, 0x00, 0x00], // &
-    [0x00, 0x05, 0x03, 0x00, 0x00, 0x00, 0x00], // '
-    [0x00, 0x1C, 0x22, 0x41, 0x00, 0x00, 0x00], // (
-    [0x00, 0x41, 0x22, 0x1C, 0x00, 0x00, 0x00], // )
-    [0x14, 0x08, 0x3E, 0x08, 0x14, 0x00, 0x00], // *
-    [0x08, 0x08, 0x3E, 0x08, 0x08, 0x00, 0x00], // +
-    [0x00, 0x50, 0x30, 0x00, 0x00, 0x00, 0x00], // ,
-    [0x08, 0x08, 0x08, 0x08, 0x08, 0x00, 0x00], // -
-    [0x00, 0x60, 0x60, 0x00, 0x00, 0x00, 0x00], // .
-    [0x20, 0x10, 0x08, 0x04, 0x02, 0x00, 0x00], // /
-    [0x3E, 0x51, 0x49, 0x45, 0x3E, 0x00, 0x00], // 0
-    [0x00, 0x42, 0x7F, 0x40, 0x00, 0x00, 0x00], // 1
-    [0x42, 0x61, 0x51, 0x49, 0x46, 0x00, 0x00], // 2
-    [0x21, 0x41, 0x45, 0x4B, 0x31, 0x00, 0x00], // 3
-    [0x18, 0x14, 0x12, 0x7F, 0x10, 0x00, 0x00], // 4
-    [0x27, 0x45, 0x45, 0x45, 0x39, 0x00, 0x00], // 5
-    [0x3C, 0x4A, 0x49, 0x49, 0x30, 0x00, 0x00], // 6
-    [0x01, 0x71, 0x09, 0x05, 0x03, 0x00, 0x00], // 7
-    [0x36, 0x49, 0x49, 0x49, 0x36, 0x00, 0x00], // 8
-    [0x06, 0x49, 0x49, 0x29, 0x1E, 0x00, 0x00], // 9
-    [0x00, 0x36, 0x36, 0x00, 0x00, 0x00, 0x00], // :
-    [0x00, 0x56, 0x36, 0x00, 0x00, 0x00, 0x00], // ;
-    [0x08, 0x14, 0x22, 0x41, 0x00, 0x00, 0x00], // <
-    [0x14, 0x14, 0x14, 0x14, 0x14, 0x00, 0x00], // =
-    [0x00, 0x41, 0x22, 0x14, 0x08, 0x00, 0x00], // >
-    [0x02, 0x01, 0x51, 0x09, 0x06, 0x00, 0x00], // ?
-    [0x32, 0x49, 0x79, 0x41, 0x3E, 0x00, 0x00], // @
-    [0x7E, 0x11, 0x11, 0x11, 0x7E, 0x00, 0x00], // A
-    [0x7F, 0x49, 0x49, 0x49, 0x36, 0x00, 0x00], // B
-    [0x3E, 0x41, 0x41, 0x41, 0x22, 0x00, 0x00], // C
-    [0x7F, 0x41, 0x41, 0x22, 0x1C, 0x00, 0x00], // D
-    [0x7F, 0x49, 0x49, 0x49, 0x41, 0x00, 0x00], // E
-    [0x7F, 0x09, 0x09, 0x09, 0x01, 0x00, 0x00], // F
-    [0x3E, 0x41, 0x49, 0x49, 0x7A, 0x00, 0x00], // G
-    [0x7F, 0x08, 0x08, 0x08, 0x7F, 0x00, 0x00], // H
-    [0x00, 0x41, 0x7F, 0x41, 0x00, 0x00, 0x00], // I
-    [0x20, 0x40, 0x41, 0x3F, 0x01, 0x00, 0x00], // J
-    [0x7F, 0x08, 0x14, 0x22, 0x41, 0x00, 0x00], // K
-    [0x7F, 0x40, 0x40, 0x40, 0x40, 0x00, 0x00], // L
-    [0x7F, 0x02, 0x0C, 0x02, 0x7F, 0x00, 0x00], // M
-    [0x7F, 0x04, 0x08, 0x10, 0x7F, 0x00, 0x00], // N
-    [0x3E, 0x41, 0x41, 0x41, 0x3E, 0x00, 0x00], // O
-    [0x7F, 0x09, 0x09, 0x09, 0x06, 0x00, 0x00], // P
-    [0x3E, 0x41, 0x51, 0x21, 0x5E, 0x00, 0x00], // Q
-    [0x7F, 0x09, 0x19, 0x29, 0x46, 0x00, 0x00], // R
-    [0x46, 0x49, 0x49, 0x49, 0x31, 0x00, 0x00], // S
-    [0x01, 0x01, 0x7F, 0x01, 0x01, 0x00, 0x00], // T
-    [0x3F, 0x40, 0x40, 0x40, 0x3F, 0x00, 0x00], // U
-    [0x1F, 0x20, 0x40, 0x20, 0x1F, 0x00, 0x00], // V
-    [0x3F, 0x40, 0x38, 0x40, 0x3F, 0x00, 0x00], // W
-    [0x63, 0x14, 0x08, 0x14, 0x63, 0x00, 0x00], // X
-    [0x07, 0x08, 0x70, 0x08, 0x07, 0x00, 0x00], // Y
-    [0x61, 0x51, 0x49, 0x45, 0x43, 0x00, 0x00], // Z
-    [0x00, 0x7F, 0x41, 0x41, 0x00, 0x00, 0x00], // [
-    [0x02, 0x04, 0x08, 0x10, 0x20, 0x00, 0x00], // \
-    [0x00, 0x41, 0x41, 0x7F, 0x00, 0x00, 0x00], // ]
-    [0x04, 0x02, 0x01, 0x02, 0x04, 0x00, 0x00], // ^
-    [0x40, 0x40, 0x40, 0x40, 0x40, 0x00, 0x00], // _
-    [0x00, 0x01, 0x02, 0x04, 0x00, 0x00, 0x00], // `
-    [0x20, 0x54, 0x54, 0x54, 0x78, 0x00, 0x00], // a
-    [0x7F, 0x48, 0x44, 0x44, 0x38, 0x00, 0x00], // b
-    [0x38, 0x44, 0x44, 0x44, 0x20, 0x00, 0x00], // c
-    [0x38, 0x44, 0x44, 0x48, 0x7F, 0x00, 0x00], // d
-    [0x38, 0x54, 0x54, 0x54, 0x18, 0x00, 0x00], // e
-    [0x08, 0x7E, 0x09, 0x01, 0x02, 0x00, 0x00], // f
-    [0x0C, 0x52, 0x52, 0x52, 0x3E, 0x00, 0x00], // g
-    [0x7F, 0x08, 0x04, 0x04, 0x78, 0x00, 0x00], // h
-    [0x00, 0x44, 0x7D, 0x40, 0x00, 0x00, 0x00], // i
-    [0x20, 0x40, 0x44, 0x3D, 0x00, 0x00, 0x00], // j
-    [0x7F, 0x10, 0x28, 0x44, 0x00, 0x00, 0x00], // k
-    [0x00, 0x41, 0x7F, 0x40, 0x00, 0x00, 0x00], // l
-    [0x7C, 0x04, 0x18, 0x04, 0x78, 0x00, 0x00], // m
-    [0x7C, 0x08, 0x04, 0x04, 0x78, 0x00, 0x00], // n
-    [0x38, 0x44, 0x44, 0x44, 0x38, 0x00, 0x00], // o
-    [0x7C, 0x14, 0x14, 0x14, 0x08, 0x00, 0x00], // p
-    [0x08, 0x14, 0x14, 0x18, 0x7C, 0x00, 0x00], // q
-    [0x7C, 0x08, 0x04, 0x04, 0x08, 0x00, 0x00], // r
-    [0x48, 0x54, 0x54, 0x54, 0x20, 0x00, 0x00], // s
-    [0x04, 0x3F, 0x44, 0x40, 0x20, 0x00, 0x00], // t
-    [0x3C, 0x40, 0x40, 0x20, 0x7C, 0x00, 0x00], // u
-    [0x1C, 0x20, 0x40, 20, 0x1C, 0x00, 0x00], // v
-    [0x3C, 0x40, 0x30, 0x40, 0x3C, 0x00, 0x00], // w
-    [0x44, 0x28, 0x10, 0x28, 0x44, 0x00, 0x00], // x
-    [0x0C, 0x50, 0x50, 0x50, 0x3C, 0x00, 0x00], // y
-    [0x44, 0x64, 0x54, 0x4C, 0x44, 0x00, 0x00], // z
-    [0x00, 0x08, 0x36, 0x41, 0x00, 0x00, 0x00], // {
-    [0x00, 0x00, 0x7F, 0x00, 0x00, 0x00, 0x00], // |
-    [0x00, 0x41, 0x36, 0x08, 0x00, 0x00, 0x00], // }
-    [0x08, 0x04, 0x08, 0x10, 0x08, 0x00, 0x00], // ~
-];
-
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub surface: wgpu::Surface<'static>,
     pub surface_config: wgpu::SurfaceConfiguration,
+    pub text_manager: std::sync::Mutex<TextManager>,
 }
 
 impl GpuContext {
     pub async fn new(window: Arc<Window>, width: u32, height: u32) -> Self {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let surface = instance.create_surface(window).unwrap();
 
         let adapter = instance
@@ -141,11 +47,9 @@ impl GpuContext {
                 &wgpu::DeviceDescriptor {
                     label: Some("Main Device"),
                     required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_webgl2_defaults()
-                        .using_resolution(adapter.limits()),
+                    required_limits: wgpu::Limits::default(),
                     ..Default::default()
                 },
-                None,
             )
             .await
             .expect("Failed to create device");
@@ -171,11 +75,14 @@ impl GpuContext {
 
         surface.configure(&device, &surface_config);
 
+        let text_manager = TextManager::new(&device, &queue, &surface_format);
+
         Self {
             device,
             queue,
             surface,
             surface_config,
+            text_manager: std::sync::Mutex::new(text_manager),
         }
     }
 
@@ -192,7 +99,10 @@ impl GpuContext {
     }
 
     pub fn get_frame(&self) -> Option<wgpu::SurfaceTexture> {
-        self.surface.get_current_texture().ok()
+        match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(texture) => Some(texture),
+            _ => None,
+        }
     }
 }
 
@@ -201,6 +111,8 @@ pub struct Canvas {
     vertex_buffer: wgpu::Buffer,
     vertices: Vec<Vertex>,
     max_vertices: usize,
+    text_queue: Vec<(cosmic_text::Buffer, f32, f32, [f32; 4])>,
+    transform_stack: Vec<Mat3>,
 }
 
 impl Canvas {
@@ -213,7 +125,7 @@ impl Canvas {
         let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Canvas Layout"),
             bind_group_layouts: &[],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -242,7 +154,7 @@ impl Canvas {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -259,63 +171,78 @@ impl Canvas {
             vertex_buffer,
             vertices: Vec::with_capacity(max_vertices),
             max_vertices,
+            text_queue: Vec::new(),
+            transform_stack: vec![Mat3::identity()],
         }
+    }
+
+    pub fn push_transform(&mut self, transform: Mat3) {
+        let current = self.current_transform();
+        self.transform_stack.push(current.multiply(&transform));
+    }
+
+    pub fn pop_transform(&mut self) {
+        if self.transform_stack.len() > 1 {
+            self.transform_stack.pop();
+        }
+    }
+
+    fn current_transform(&self) -> Mat3 {
+        *self.transform_stack.last().unwrap_or(&Mat3::identity())
     }
 
     pub fn draw_rectangle(&mut self, x: f32, y: f32, w: f32, h: f32, color: [f32; 4]) {
         if self.vertices.len() + 6 > self.max_vertices {
             return;
         }
-        let v1 = Vertex { position: [x, y], color };
-        let v2 = Vertex { position: [x + w, y], color };
-        let v3 = Vertex { position: [x, y + h], color };
-        let v4 = Vertex { position: [x + w, y + h], color };
+        
+        let transform = self.current_transform();
+        
+        let p1 = transform.transform_point(Vec2::new(x, y));
+        let p2 = transform.transform_point(Vec2::new(x + w, y));
+        let p3 = transform.transform_point(Vec2::new(x, y + h));
+        let p4 = transform.transform_point(Vec2::new(x + w, y + h));
+
+        let v1 = Vertex { position: [p1.x, p1.y], color };
+        let v2 = Vertex { position: [p2.x, p2.y], color };
+        let v3 = Vertex { position: [p3.x, p3.y], color };
+        let v4 = Vertex { position: [p4.x, p4.y], color };
 
         self.vertices.extend_from_slice(&[v1, v2, v3, v2, v4, v3]);
     }
 
     pub fn draw_circle(&mut self, cx: f32, cy: f32, r: f32, color: [f32; 4]) {
+        if self.vertices.len() + (32 * 3) > self.max_vertices {
+            return;
+        }
+        let transform = self.current_transform();
         let segments = 32;
         for i in 0..segments {
             let angle1 = (i as f32 / segments as f32) * std::f32::consts::TAU;
             let angle2 = ((i + 1) as f32 / segments as f32) * std::f32::consts::TAU;
             
-            let v1 = Vertex { position: [cx, cy], color };
-            let v2 = Vertex { position: [cx + angle1.cos() * r, cy + angle1.sin() * r], color };
-            let v3 = Vertex { position: [cx + angle2.cos() * r, cy + angle2.sin() * r], color };
+            let p1 = transform.transform_point(Vec2::new(cx, cy));
+            let p2 = transform.transform_point(Vec2::new(cx + angle1.cos() * r, cy + angle1.sin() * r));
+            let p3 = transform.transform_point(Vec2::new(cx + angle2.cos() * r, cy + angle2.sin() * r));
+            
+            let v1 = Vertex { position: [p1.x, p1.y], color };
+            let v2 = Vertex { position: [p2.x, p2.y], color };
+            let v3 = Vertex { position: [p3.x, p3.y], color };
             
             self.vertices.extend_from_slice(&[v1, v2, v3]);
         }
     }
 
-    pub fn draw_text(&mut self, text: &str, x: f32, y: f32, font_size: f32, color: [f32; 4]) {
-        let mut cx = x;
-        let pixel_w = font_size * 0.6;
-        let pixel_h = font_size * 0.8;
-
-        for c in text.chars() {
-            if let Some(bits) = FONT_DATA.get((c as usize).saturating_sub(32)) {
-                for row in 0..7 {
-                    let row_bits = bits[row];
-                    for col in 0..5 {
-                        if (row_bits & (1 << (4 - col))) != 0 {
-                            let px = cx + col as f32 * pixel_w;
-                            let py = y + row as f32 * pixel_h;
-                            self.draw_rectangle(px, py, pixel_w, pixel_h, color);
-                        }
-                    }
-                }
-                cx += 6.0 * pixel_w;
-            }
-        }
+    pub fn draw_text(&mut self, gpu: &GpuContext, text: &str, x: f32, y: f32, font_size: f32, color: [f32; 4]) {
+        let transform = self.current_transform();
+        let pos = transform.transform_point(Vec2::new(x, y));
+        
+        let buffer = gpu.text_manager.lock().unwrap().create_buffer(text, font_size);
+        self.text_queue.push((buffer, pos.x, pos.y, color));
     }
 
-    pub fn end_drawing(&mut self, gpu: &GpuContext, view: &wgpu::TextureView, clear_color: [f32; 4]) {
+    pub fn end_drawing(&mut self, gpu: &GpuContext, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, clear_color: [f32; 4]) {
         gpu.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&self.vertices));
-
-        let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Canvas Render Encoder"),
-        });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -332,10 +259,12 @@ impl Canvas {
                         }),
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
+                multiview_mask: None,
             });
 
             render_pass.set_pipeline(&self.pipeline);
@@ -343,7 +272,15 @@ impl Canvas {
             render_pass.draw(0..self.vertices.len() as u32, 0..1);
         }
 
-        gpu.queue.submit(std::iter::once(encoder.finish()));
+        if !self.text_queue.is_empty() {
+            let sw = gpu.surface_config.width as f32;
+            let sh = gpu.surface_config.height as f32;
+            
+            let texts = std::mem::take(&mut self.text_queue);
+            gpu.text_manager.lock().unwrap().render(&gpu.device, &gpu.queue, encoder, view, &texts, sw, sh);
+        }
+
         self.vertices.clear();
+        self.text_queue.clear();
     }
 }

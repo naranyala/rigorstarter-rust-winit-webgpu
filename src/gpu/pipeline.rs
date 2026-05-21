@@ -82,10 +82,12 @@ impl RenderPipelineBuilder {
     pub fn build(self, device: &wgpu::Device, bind_groups: &[&wgpu::BindGroupLayout]) -> RenderPipeline {
         let shader = self.shader.expect("Shader must be set");
 
+        let layouts: Vec<Option<&wgpu::BindGroupLayout>> = bind_groups.iter().map(|&bg| Some(bg)).collect();
+
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some(&format!("{} Layout", self.label)),
-            bind_group_layouts: bind_groups,
-            push_constant_ranges: &[],
+            bind_group_layouts: &layouts,
+            immediate_size: 0,
         });
 
         let inner = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -122,7 +124,7 @@ impl RenderPipelineBuilder {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
