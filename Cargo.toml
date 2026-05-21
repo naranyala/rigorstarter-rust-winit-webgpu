@@ -1,0 +1,12 @@
+[package]
+name = "rigorstarter-rust-tauri-webgpu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+winit = "0.30"
+wgpu = "24"
+pollster = "0.4"
+env_logger = "0.11"
+rand = "0.8"
+bytemuck = "1.25"
