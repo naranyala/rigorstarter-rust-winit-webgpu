@@ -251,3 +251,105 @@ impl IndexMut<usize> for Vec3 {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vec2_ops() {
+        let a = Vec2::new(1.0, 2.0);
+        let b = Vec2::new(3.0, 4.0);
+        
+        assert_eq!(a + b, Vec2::new(4.0, 6.0));
+        assert_eq!(b - a, Vec2::new(2.0, 2.0));
+        assert_eq!(a * 2.0, Vec2::new(2.0, 4.0));
+        assert_eq!(b / 2.0, Vec2::new(1.5, 2.0));
+    }
+
+    #[test]
+    fn test_vec2_length() {
+        let a = Vec2::new(3.0, 4.0);
+        assert_eq!(a.length(), 5.0);
+        assert_eq!(a.length_squared(), 25.0);
+    }
+
+    #[test]
+    fn test_vec2_normalize() {
+        let a = Vec2::new(3.0, 0.0);
+        assert_eq!(a.normalize(), Vec2::X);
+        
+        let zero = Vec2::ZERO;
+        assert_eq!(zero.normalize(), Vec2::ZERO);
+    }
+
+    #[test]
+    fn test_vec2_dot() {
+        let a = Vec2::new(1.0, 0.0);
+        let b = Vec2::new(0.0, 1.0);
+        assert_eq!(a.dot(b), 0.0);
+        assert_eq!(a.dot(a), 1.0);
+    }
+
+    #[test]
+    fn test_vec2_lerp() {
+        let a = Vec2::new(0.0, 0.0);
+        let b = Vec2::new(10.0, 10.0);
+        assert_eq!(a.lerp(b, 0.0), a);
+        assert_eq!(a.lerp(b, 1.0), b);
+        assert_eq!(a.lerp(b, 0.5), Vec2::new(5.0, 5.0));
+    }
+
+    #[test]
+    fn test_vec2_perp() {
+        let a = Vec2::X;
+        assert_eq!(a.perp(), Vec2::Y);
+        let b = Vec2::Y;
+        assert_eq!(b.perp(), Vec2::new(-1.0, 0.0));
+    }
+
+    #[test]
+    fn test_vec3_ops() {
+        let a = Vec3::new(1.0, 2.0, 3.0);
+        let b = Vec3::new(4.0, 5.0, 6.0);
+        
+        assert_eq!(a + b, Vec3::new(5.0, 7.0, 9.0));
+        assert_eq!(b - a, Vec3::new(3.0, 3.0, 3.0));
+        assert_eq!(a * 2.0, Vec3::new(2.0, 4.0, 6.0));
+        assert_eq!(b / 2.0, Vec3::new(2.0, 2.5, 3.0));
+    }
+
+    #[test]
+    fn test_vec3_cross() {
+        let a = Vec3::X;
+        let b = Vec3::Y;
+        assert_eq!(a.cross(b), Vec3::Z);
+        assert_eq!(b.cross(a), Vec3::new(0.0, 0.0, -1.0));
+    }
+
+    #[test]
+    fn test_vec3_normalize() {
+        let a = Vec3::new(0.0, 5.0, 0.0);
+        assert_eq!(a.normalize(), Vec3::Y);
+        
+        let zero = Vec3::ZERO;
+        assert_eq!(zero.normalize(), Vec3::ZERO);
+    }
+
+    #[test]
+    fn test_vec3_dot() {
+        let a = Vec3::X;
+        let b = Vec3::Y;
+        assert_eq!(a.dot(b), 0.0);
+        assert_eq!(a.dot(a), 1.0);
+    }
+
+    #[test]
+    fn test_vec3_lerp() {
+        let a = Vec3::ZERO;
+        let b = Vec3::ONE;
+        assert_eq!(a.lerp(b, 0.0), a);
+        assert_eq!(a.lerp(b, 1.0), b);
+        assert_eq!(a.lerp(b, 0.5), Vec3::new(0.5, 0.5, 0.5));
+    }
+}

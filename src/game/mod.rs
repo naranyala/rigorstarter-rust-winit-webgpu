@@ -1,5 +1,4 @@
 pub mod snake;
-pub mod key_indicator;
 pub mod breakouts;
 pub mod pingpong;
 
@@ -39,35 +38,6 @@ impl State for SnakeState {
                 KeyCode::Escape => return Some(StateRequest::Pop),
                 _ => {}
             }
-        }
-        None
-    }
-}
-
-pub struct KeyIndicatorState {
-    game: key_indicator::KeyIndicator,
-    renderer: key_indicator::KeyIndicatorRenderer,
-}
-impl KeyIndicatorState {
-    pub fn new(gpu: &GpuContext) -> Self {
-        let game = key_indicator::KeyIndicator::new();
-        let renderer = key_indicator::KeyIndicatorRenderer::new(gpu);
-        Self { game, renderer }
-    }
-}
-impl State for KeyIndicatorState {
-    fn update(&mut self, _delta: f32, _input: &InputManager) -> Option<StateRequest> {
-        None
-    }
-    fn render(&mut self, gpu: &GpuContext, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
-        let width = gpu.surface_config.width;
-        let height = gpu.surface_config.height;
-        self.renderer.render(gpu, encoder, view, &self.game, width, height);
-    }
-    fn handle_input(&mut self, key: KeyCode, state: ElementState) -> Option<StateRequest> {
-        self.game.update(key, state == ElementState::Pressed);
-        if state == ElementState::Pressed && key == KeyCode::Escape {
-            return Some(StateRequest::Pop);
         }
         None
     }

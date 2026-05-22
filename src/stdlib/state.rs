@@ -13,19 +13,24 @@ pub enum StateRequest {
 
 /// The interface every game/screen must implement
 pub trait State {
-    fn update(&mut self, delta: f32, input: &InputManager) -> Option<StateRequest> {
+    fn update(&mut self, _delta: f32, _input: &InputManager) -> Option<StateRequest> {
         None
     }
     fn render(&mut self, gpu: &GpuContext, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView);
-    fn handle_input(&mut self, key: KeyCode, state: ElementState) -> Option<StateRequest> {
+    fn handle_input(&mut self, _key: KeyCode, _state: ElementState) -> Option<StateRequest> {
         None
     }
-    fn handle_char(&mut self, c: char) -> Option<StateRequest> {
+    fn handle_char(&mut self, _c: char) -> Option<StateRequest> {
         None
     }
-    fn handle_mouse_click(&mut self, pos: [f32; 2], sw: f32, sh: f32) -> Option<StateRequest> {
+    fn handle_mouse_click(&mut self, _pos: [f32; 2], _sw: f32, _sh: f32) -> Option<StateRequest> {
         None
-    }}
+    }
+    fn handle_mouse_wheel(&mut self, _delta_x: f32, _delta_y: f32) -> Option<StateRequest> {
+        None
+    }
+    fn update_layout(&mut self, _sw: f32, _sh: f32) {}
+}
 
 pub struct StateManager {
     stack: Vec<Box<dyn State>>,
@@ -44,12 +49,6 @@ impl StateManager {
 
     pub fn update(&mut self, delta: f32, input: &InputManager) -> Option<StateRequest> {
         let request = self.current().update(delta, input);
-        if let Some(ref req) = request {
-            // We can't clone StateRequest, so we handle it here or return it
-            // But wait, we need to apply the request.
-        }
-        // Since we can't clone, we'll just return it and let the caller handle it,
-        // or handle it inside update.
         request
     }
 
@@ -65,6 +64,20 @@ impl StateManager {
     pub fn handle_char(&mut self, c: char) -> Option<StateRequest> {
         let request = self.current().handle_char(c);
         request
+    }
+
+    pub fn handle_mouse_click(&mut self, pos: [f32; 2], sw: f32, sh: f32) -> Option<StateRequest> {
+        let request = self.current().handle_mouse_click(pos, sw, sh);
+        request
+    }
+
+    pub fn handle_mouse_wheel(&mut self, delta_x: f32, delta_y: f32) -> Option<StateRequest> {
+        let request = self.current().handle_mouse_wheel(delta_x, delta_y);
+        request
+    }
+
+    pub fn update_layout(&mut self, sw: f32, sh: f32) {
+        self.current().update_layout(sw, sh);
     }
 
     pub fn handle_request(&mut self, request: Option<StateRequest>) {
@@ -85,5 +98,50 @@ impl StateManager {
 
     pub fn is_empty(&self) -> bool {
         self.stack.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockState {
+        id: i32,
+    }
+
+    impl State for MockState {
+        fn render(&mut self, _gpu: &GpuContext, _encoder: &mut wgpu::CommandEncoder, _view: &wgpu::TextureView) {}
+    }
+
+    #[test]
+    fn test_state_manager_stack() {
+        let s1 = Box::new(MockState { id: 1 });
+        let mut sm = StateManager::new(s1);
+        
+        assert!(!sm.is_empty());
+        
+        let s2 = Box::new(MockState { id: 2 });
+        sm.handle_request(Some(StateRequest::Push(s2)));
+        
+        // Pop s2
+        sm.handle_request(Some(StateRequest::Pop));
+        
+        // Pop s1
+        sm.handle_request(Some(StateRequest::Pop));
+        
+        assert!(sm.is_empty());
+    }
+
+    #[test]
+    fn test_state_manager_replace() {
+        let s1 = Box::new(MockState { id: 1 });
+        let mut sm = StateManager::new(s1);
+        
+        let s2 = Box::new(MockState { id: 2 });
+        sm.handle_request(Some(StateRequest::Replace(s2)));
+        
+        // Replace should keep stack size at 1
+        sm.handle_request(Some(StateRequest::Pop));
+        assert!(sm.is_empty());
     }
 }

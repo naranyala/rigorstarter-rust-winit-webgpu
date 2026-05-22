@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, WindowEvent, MouseScrollDelta};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::KeyCode;
 use winit::window::{Window, WindowAttributes};
@@ -9,10 +9,6 @@ use winit::window::{Window, WindowAttributes};
 use rigorstarter_rust_tauri_webgpu::gpu::GpuContext;
 use rigorstarter_rust_tauri_webgpu::ui::launcher::{LauncherRenderer, LauncherState};
 use rigorstarter_rust_tauri_webgpu::stdlib::{Clock, InputManager, State, StateManager, StateRequest};
-use rigorstarter_rust_tauri_webgpu::game::snake::{SnakeGame, SnakeRenderer};
-use rigorstarter_rust_tauri_webgpu::game::key_indicator::{KeyIndicator, KeyIndicatorRenderer};
-use rigorstarter_rust_tauri_webgpu::game::breakouts::{BreakoutsGame, BreakoutsRenderer, BreakoutsState};
-use rigorstarter_rust_tauri_webgpu::game::pingpong::{PingPongGame, PingPongRenderer, PingPongState};
 
 
 const WINDOW_WIDTH: u32 = 900;
@@ -26,17 +22,13 @@ struct LauncherStateWrapper {
 }
 
 impl State for LauncherStateWrapper {
-    fn update(&mut self, delta: f32, input: &InputManager) -> Option<StateRequest> {
+    fn update(&mut self, delta: f32, _input: &InputManager) -> Option<StateRequest> {
         self.state.update(delta as f64);
         None
     }
 
     fn render(&mut self, gpu: &GpuContext, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
-        let clear_color = [0.05, 0.05, 0.1, 1.0];
         self.renderer.render(gpu, encoder, view, &self.state);
-        // LauncherRenderer already handles end_drawing? 
-        // No, it probably needs clear_color.
-        // Let's assume it manages its own canvas.
     }
 
     fn handle_input(&mut self, key: KeyCode, state: ElementState) -> Option<StateRequest> {
@@ -50,6 +42,10 @@ impl State for LauncherStateWrapper {
 
     fn handle_mouse_click(&mut self, pos: [f32; 2], sw: f32, sh: f32) -> Option<StateRequest> {
         self.state.handle_mouse_click(pos, sw, sh, &self.gpu)
+    }
+
+    fn update_layout(&mut self, sw: f32, sh: f32) {
+        self.state.update_layout(sw, sh);
     }
 }
 
@@ -77,7 +73,8 @@ impl App {
     async fn init(&mut self, window: Arc<Window>) {
         let gpu = Arc::new(GpuContext::new(window.clone(), WINDOW_WIDTH, WINDOW_HEIGHT).await);
         
-        let launcher = LauncherState::new();
+        let mut launcher = LauncherState::new();
+        launcher.update_layout(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
         let launcher_renderer = LauncherRenderer::new(&gpu);
         let initial_state = Box::new(LauncherStateWrapper {
             state: launcher,
@@ -149,13 +146,12 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
                 if let Some(gpu) = &mut self.gpu {
-                    // Since gpu is Arc, we need to get mut ref. 
-                    // Actually, GpuContext::resize takes &mut self.
-                    // We should use Arc::get_mut or just wrap GpuContext in Mutex/RwLock if needed.
-                    // But here, the App has the only Arc.
                     if let Some(gpu_mut) = Arc::get_mut(gpu) {
                         gpu_mut.resize(size.width, size.height);
                     }
+                }
+                if let Some(sm) = &mut self.state_manager {
+                    sm.update_layout(size.width as f32, size.height as f32);
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -170,6 +166,15 @@ impl ApplicationHandler for App {
                     let sw = gpu.surface_config.width as f32;
                     let sh = gpu.surface_config.height as f32;
                     let request = sm.current().handle_mouse_click(self.cursor_pos, sw, sh);
+                    sm.handle_request(request);
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                if let Some(sm) = &mut self.state_manager {
+                    let request = match delta {
+                        MouseScrollDelta::LineDelta(x, y) => sm.handle_mouse_wheel(x, y),
+                        MouseScrollDelta::PixelDelta(pos) => sm.handle_mouse_wheel(pos.x as f32, pos.y as f32),
+                    };
                     sm.handle_request(request);
                 }
             }
