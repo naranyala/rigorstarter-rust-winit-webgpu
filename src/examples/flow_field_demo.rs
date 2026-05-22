@@ -1,6 +1,8 @@
 use crate::gpu::{Canvas, GpuContext};
 use crate::stdlib::{State, StateRequest, InputManager};
 use crate::stdlib::linear_algebra::vector::Vec2;
+use winit::keyboard::KeyCode;
+use winit::event::ElementState;
 use rand::Rng;
 
 struct Particle {
@@ -57,12 +59,12 @@ impl FlowFieldDemoState {
         }
     }
 
-    fn sample_field(&self, pos: Vec2) -> Vec2 {
+    fn sample_field(pos: Vec2, time: f32) -> Vec2 {
         let scale = 0.005;
         // Create a swirling flow field using sine/cosine
         let angle = (pos.x * scale).sin() * 2.0 * std::f32::consts::PI 
                   + (pos.y * scale).cos() * 2.0 * std::f32::consts::PI 
-                  + self.time;
+                  + time;
         
         Vec2::new(angle.cos(), angle.sin())
     }
@@ -77,7 +79,7 @@ impl State for FlowFieldDemoState {
 
         for p in &mut self.particles {
             // 1. Sample the field
-            let force = self.sample_field(p.pos);
+            let force = Self::sample_field(p.pos, self.time);
             
             // 2. Handle attractor
             if self.attractor_active {

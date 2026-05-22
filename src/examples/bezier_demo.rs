@@ -38,8 +38,8 @@ impl BezierDemoState {
 }
 
 impl State for BezierDemoState {
-    fn update(&mut self, _delta: f32, input: &InputManager) -> Option<StateRequest> {
-        if let Some(idx) = self.selected_point {
+    fn update(&mut self, _delta: f32, _input: &InputManager) -> Option<StateRequest> {
+        if let Some(_idx) = self.selected_point {
             // Assume we have access to mouse position. 
             // Since we don't have it in update, we'll handle dragging in handle_mouse_click 
             // or we'd need to add mouse_move to the State trait.
@@ -57,8 +57,8 @@ impl State for BezierDemoState {
 
         // 1. Draw the control polygon
         for i in 0..self.points.len() - 1 {
-            let p0 = self.points[i];
-            let p1 = self.points[i+1];
+            let _p0 = self.points[i];
+            let _p1 = self.points[i+1];
             // We don't have a draw_line in Canvas, but we can simulate it 
             // by drawing many small rectangles or using a different method.
             // Since Canvas is simple, let's just draw the points for now 

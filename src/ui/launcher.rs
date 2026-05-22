@@ -119,7 +119,7 @@ impl LauncherState {
         }
     }
 
-    pub fn update_layout(&mut self, sw: f32, sh: f32) {
+    pub fn update_layout(&mut self, _sw: f32, sh: f32) {
         let panel_h = sh * 0.65;
         let pad = 16.0;
         let search_h = 36.0;
@@ -142,7 +142,7 @@ impl LauncherState {
             KeyCode::Enter => {
                 let filtered = self.filtered_items();
                 if let Some((_, item)) = filtered.get(self.selected_index) {
-                    return Some(StateRequest::Push((item).creator(gpu)));
+                    return Some(StateRequest::Push((item.creator)(gpu)));
                 }
             }
             KeyCode::ArrowUp => {
@@ -273,7 +273,7 @@ impl LauncherState {
             self.selected_index = i;
             let filtered = self.filtered_items();
             if let Some((_, item)) = filtered.get(self.selected_index) {
-                return Some(StateRequest::Push((item).creator(gpu)));
+                return Some(StateRequest::Push((item.creator)(gpu)));
             }
         }
         None
